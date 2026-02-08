@@ -628,6 +628,18 @@ const AdminDashboard = () => {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => navigate(`/admin/profile/${profile.id}/theme-settings`)}
+                        className="flex-1 text-purple-600 hover:bg-purple-50"
+                        title="Theme & Design Settings (Phase 34)"
+                      >
+                        <Paintbrush className="w-4 h-4 mr-1" />
+                        Theme Settings
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => navigate(`/admin/profile/${profile.id}/referrals`)}
                         className="flex-1 text-emerald-600 hover:bg-emerald-50"
                         title="Referrals & Credits (Phase 35)"
