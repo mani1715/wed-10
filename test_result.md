@@ -272,7 +272,7 @@ agent_communication:
       - Test plan expiry logic
       - Verify audit logging for plan changes
 
-user_problem_statement: "Build and test complete wedding invitation management web application from GitHub repository https://github.com/mani1715/wed-9. Application includes admin dashboard, profile/event management, RSVP system, analytics, AI-powered features, post-wedding albums, PHASE 29E (Admin Safety Nets & Recovery System), PHASE 30 (Analytics, Insights & Guest Intelligence), PHASE 31 (SEO, Social Sharing & Discovery), PHASE 33 (Monetization & Premium Plans), and PHASE 35 (Referral, Credits & Viral Growth Engine). User will specify additional features to add after initial setup."
+user_problem_statement: "Build and test complete wedding invitation management web application from GitHub repository https://github.com/mani1715/wed-10. Application includes admin dashboard, profile/event management, RSVP system, analytics, AI-powered features, post-wedding albums, PHASE 29E (Admin Safety Nets & Recovery System), PHASE 30 (Analytics, Insights & Guest Intelligence), PHASE 31 (SEO, Social Sharing & Discovery), PHASE 33 (Monetization & Premium Plans), PHASE 34 (Design System & Theme Engine), PHASE 35 (Referral, Credits & Viral Growth Engine), and PHASE 36 (Template Marketplace & Creator Ecosystem). User will specify additional features to add after initial setup."
 
 # ============================================================================
 # PHASE 35: REFERRAL, CREDITS & VIRAL GROWTH ENGINE - FULLY IMPLEMENTED
