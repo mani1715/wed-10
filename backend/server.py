@@ -9380,6 +9380,299 @@ async def get_public_referral_code(profile_id: str):
 
 
 # ==========================================
+# PHASE 34: DESIGN SYSTEM & THEME ENGINE
+# ==========================================
+
+@api_router.get("/themes")
+async def get_all_themes(
+    plan_type: Optional[str] = None
+):
+    """
+    PHASE 34: Get all available themes
+    Optionally filter by plan type to show only accessible themes
+    """
+    from theme_constants import get_all_themes_preview, get_themes_by_plan, MASTER_THEMES
+    
+    try:
+        if plan_type:
+            # Filter themes by plan access
+            accessible_theme_ids = get_themes_by_plan(plan_type)
+            all_themes = get_all_themes_preview()
+            filtered_themes = [t for t in all_themes if t['id'] in accessible_theme_ids]
+            
+            return {
+                "themes": filtered_themes,
+                "total": len(filtered_themes),
+                "plan_type": plan_type
+            }
+        else:
+            # Return all themes
+            all_themes = get_all_themes_preview()
+            return {
+                "themes": all_themes,
+                "total": len(all_themes)
+            }
+    
+    except Exception as e:
+        logger.error(f"Error getting themes: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting themes: {str(e)}"
+        )
+
+
+@api_router.get("/themes/{theme_id}")
+async def get_theme_details(theme_id: str):
+    """
+    PHASE 34: Get detailed theme configuration
+    """
+    from theme_constants import get_theme_by_id
+    
+    try:
+        theme = get_theme_by_id(theme_id)
+        if not theme:
+            raise ErrorResponse.not_found(f"Theme '{theme_id}' not found")
+        
+        return {
+            "theme": theme,
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting theme details: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting theme details: {str(e)}"
+        )
+
+
+@api_router.get("/profiles/{profile_id}/theme")
+async def get_profile_theme(
+    profile_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    PHASE 34: Get current theme settings for a profile
+    """
+    from theme_constants import get_theme_by_id
+    
+    try:
+        profile = await db.profiles.find_one({"id": profile_id})
+        if not profile:
+            raise ErrorResponse.not_found("Profile not found")
+        
+        # Get theme settings or use defaults
+        theme_settings = profile.get("theme_settings", {
+            "theme_id": "royal_heritage",
+            "animation_level": "subtle",
+            "glassmorphism_enabled": True,
+            "color_overrides": {},
+            "hero_type": "static"
+        })
+        
+        # Get full theme data
+        theme_data = get_theme_by_id(theme_settings.get("theme_id", "royal_heritage"))
+        
+        return {
+            "theme_settings": theme_settings,
+            "theme_data": theme_data,
+            "profile_id": profile_id
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting profile theme: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting profile theme: {str(e)}"
+        )
+
+
+@api_router.put("/profiles/{profile_id}/theme")
+async def update_profile_theme(
+    profile_id: str,
+    theme_update: ThemeUpdateRequest,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    PHASE 34: Update theme settings for a profile
+    Includes plan-based access control
+    """
+    from theme_constants import can_use_theme, is_valid_theme, get_theme_by_id
+    from feature_gating import get_plan_info
+    
+    try:
+        # Get profile
+        profile = await db.profiles.find_one({"id": profile_id})
+        if not profile:
+            raise ErrorResponse.not_found("Profile not found")
+        
+        # Validate theme exists
+        if not is_valid_theme(theme_update.theme_id):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid theme ID: {theme_update.theme_id}"
+            )
+        
+        # Check plan-based access
+        user_plan = profile.get("plan_type", "FREE")
+        if not can_use_theme(theme_update.theme_id, user_plan):
+            theme_data = get_theme_by_id(theme_update.theme_id)
+            required_plan = theme_data.get("planRequired", "PLATINUM")
+            raise HTTPException(
+                status_code=403,
+                detail=f"This theme requires {required_plan} plan or higher"
+            )
+        
+        # Get current theme settings or create new
+        theme_settings = profile.get("theme_settings", {})
+        
+        # Update only provided fields
+        update_data = {}
+        if theme_update.theme_id:
+            update_data["theme_settings.theme_id"] = theme_update.theme_id
+        if theme_update.animation_level is not None:
+            update_data["theme_settings.animation_level"] = theme_update.animation_level
+        if theme_update.glassmorphism_enabled is not None:
+            update_data["theme_settings.glassmorphism_enabled"] = theme_update.glassmorphism_enabled
+        if theme_update.color_overrides is not None:
+            update_data["theme_settings.color_overrides"] = theme_update.color_overrides
+        if theme_update.hero_type is not None:
+            update_data["theme_settings.hero_type"] = theme_update.hero_type
+        
+        update_data["updated_at"] = datetime.now(timezone.utc)
+        
+        # Update profile
+        result = await db.profiles.update_one(
+            {"id": profile_id},
+            {"$set": update_data}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update theme settings"
+            )
+        
+        # Get updated theme settings
+        updated_profile = await db.profiles.find_one({"id": profile_id})
+        updated_theme_settings = updated_profile.get("theme_settings", {})
+        
+        # Audit log
+        await db.audit_logs.insert_one({
+            "log_id": f"audit_{uuid.uuid4().hex[:16]}",
+            "admin_id": current_admin.get("admin_id"),
+            "profile_id": profile_id,
+            "action": "update_theme",
+            "details": {
+                "theme_id": theme_update.theme_id,
+                "animation_level": theme_update.animation_level,
+                "glassmorphism_enabled": theme_update.glassmorphism_enabled
+            },
+            "timestamp": datetime.now(timezone.utc)
+        })
+        
+        return {
+            "success": True,
+            "message": "Theme settings updated successfully",
+            "theme_settings": updated_theme_settings
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating theme: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating theme: {str(e)}"
+        )
+
+
+@api_router.post("/themes/preview")
+async def preview_theme(
+    preview_request: ThemePreviewRequest
+):
+    """
+    PHASE 34: Get theme preview data (no auth required)
+    Used by admin for live preview before applying
+    """
+    from theme_constants import get_theme_by_id
+    
+    try:
+        theme = get_theme_by_id(preview_request.theme_id)
+        if not theme:
+            raise ErrorResponse.not_found(f"Theme '{preview_request.theme_id}' not found")
+        
+        # Return theme with preview settings
+        return {
+            "theme": theme,
+            "preview_settings": {
+                "animation_level": preview_request.animation_level,
+                "glassmorphism_enabled": preview_request.glassmorphism_enabled
+            },
+            "success": True
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error previewing theme: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error previewing theme: {str(e)}"
+        )
+
+
+@api_router.get("/themes/accessible/{profile_id}")
+async def get_accessible_themes(
+    profile_id: str
+):
+    """
+    PHASE 34: Get themes accessible to a profile based on their plan
+    Public endpoint for guest view (shows locked vs unlocked)
+    """
+    from theme_constants import get_all_themes_preview, get_themes_by_plan
+    
+    try:
+        # Get profile plan
+        profile = await db.profiles.find_one({"id": profile_id})
+        if not profile:
+            raise ErrorResponse.not_found("Profile not found")
+        
+        user_plan = profile.get("plan_type", "FREE")
+        
+        # Get all themes
+        all_themes = get_all_themes_preview()
+        
+        # Get accessible theme IDs
+        accessible_ids = set(get_themes_by_plan(user_plan))
+        
+        # Mark themes as locked/unlocked
+        for theme in all_themes:
+            theme['accessible'] = theme['id'] in accessible_ids
+            theme['locked'] = theme['id'] not in accessible_ids
+        
+        return {
+            "themes": all_themes,
+            "user_plan": user_plan,
+            "accessible_count": len(accessible_ids),
+            "total_count": len(all_themes)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting accessible themes: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting accessible themes: {str(e)}"
+        )
+
+
+# ==========================================
 # PHASE 36: TEMPLATE MARKETPLACE & CREATOR ECOSYSTEM
 # ==========================================
 
