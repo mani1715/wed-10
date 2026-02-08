@@ -4,7 +4,7 @@ from datetime import datetime, timezone, time, timedelta
 from enum import Enum
 import uuid
 import re
-from theme_constants import THEME_IDS, DEFAULT_THEME
+from theme_constants import THEME_IDS, DEFAULT_THEME, is_valid_theme
 
 
 class EventType(str, Enum):
