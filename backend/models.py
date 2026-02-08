@@ -93,6 +93,48 @@ class UpdateEventLordSettingsRequest(BaseModel):
         if v < 1 or v > 10:
             raise ValueError('lord_visibility_duration must be between 1 and 10 seconds')
         return v
+
+
+# ==========================================
+# PHASE 34: DESIGN SYSTEM & THEME ENGINE
+# ==========================================
+
+class ThemeSettings(BaseModel):
+    """
+    PHASE 34: Premium theme settings for design system
+    Controlled customization within locked master themes
+    """
+    theme_id: str = "royal_heritage"  # Selected master theme
+    animation_level: Literal["none", "subtle", "festive"] = "subtle"  # Animation intensity
+    glassmorphism_enabled: bool = True  # Glass effect for cards
+    color_overrides: Dict[str, str] = Field(default_factory=dict)  # Optional color customization (limited)
+    hero_type: Literal["static", "video", "animated"] = "static"  # Hero section type
+    
+    @field_validator('theme_id')
+    def validate_theme_id(cls, v):
+        """Validate theme_id is valid"""
+        if not is_valid_theme(v):
+            raise ValueError(f'Invalid theme_id. Must be one of: {", ".join(THEME_IDS)}')
+        return v
+
+
+class ThemeUpdateRequest(BaseModel):
+    """Request model for updating theme settings"""
+    theme_id: str
+    animation_level: Optional[Literal["none", "subtle", "festive"]] = None
+    glassmorphism_enabled: Optional[bool] = None
+    color_overrides: Optional[Dict[str, str]] = None
+    hero_type: Optional[Literal["static", "video", "animated"]] = None
+
+
+class ThemePreviewRequest(BaseModel):
+    """Request model for theme preview"""
+    theme_id: str
+    animation_level: Literal["none", "subtle", "festive"] = "subtle"
+    glassmorphism_enabled: bool = True
+
+
+# ==========================================
     
     
 class WeddingEvent(BaseModel):
