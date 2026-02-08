@@ -84,6 +84,8 @@ from models import (
     ReferralCodeResponse, ReferralStatsResponse, ApplyReferralRequest,
     CreditWalletResponse, SpendCreditsRequest, SpendCreditsResponse,
     CreditPricingConfig, AdminReferralOverrideRequest,
+    # PHASE 34: Design System & Theme Engine
+    ThemeSettings, ThemeUpdateRequest, ThemePreviewRequest,
     # PHASE 36: Template Marketplace & Creator Ecosystem
     Template, TemplateCreate, TemplateUpdate, TemplateResponse, TemplateListResponse,
     TemplateCategory, TemplateStatus, CreatorProfile, CreatorProfileCreate,
