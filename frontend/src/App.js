@@ -40,6 +40,7 @@ function App() {
                 <Route path="/admin/profile/:profileId/post-wedding" element={<PostWeddingManagement />} />
                 <Route path="/admin/profile/:profileId/qr-codes" element={<QRCodeManagement />} />
                 <Route path="/admin/profile/:profileId/referrals" element={<ReferralsCreditsPage />} />
+                <Route path="/admin/profile/:profileId/theme-settings" element={<ThemeSettingsPage />} />
                 <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
                 <Route path="/invite/:slug/:eventType" element={<PublicInvitation />} />
                 <Route path="/invite/:slug" element={<PublicInvitation />} />
