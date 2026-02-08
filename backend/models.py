@@ -610,6 +610,8 @@ class Profile(BaseModel):
     # PHASE 33: Monetization & Premium Plans
     plan_type: str = "FREE"  # FREE, SILVER, GOLD, PLATINUM
     plan_expires_at: Optional[datetime] = None  # Plan expiry date (None for FREE or permanent)
+    # PHASE 34: Design System & Theme Engine
+    theme_settings: ThemeSettings = Field(default_factory=ThemeSettings)  # Premium theme configuration
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
