@@ -13,7 +13,7 @@ import sys
 import os
 
 # Backend URL from environment
-BACKEND_URL = "https://nuptial-planner-7.preview.emergentagent.com/api"
+BACKEND_URL = "https://wedding-bliss-72.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_EMAIL = "admin@wedding.com"
