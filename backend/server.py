@@ -9365,6 +9365,18 @@ async def get_public_referral_code(profile_id: str):
             "created_at": datetime.now(timezone.utc)
         }
         await db.referrals.insert_one(referral_data)
+        
+        return {
+            "referral_code": referral_code,
+            "profile_id": profile_id
+        }
+    
+    except Exception as e:
+        logger.error(f"Error getting public referral code: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting referral code: {str(e)}"
+        )
 
 
 # ==========================================
