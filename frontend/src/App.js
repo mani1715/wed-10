@@ -17,6 +17,7 @@ import PostWeddingManagement from './pages/PostWeddingManagement';
 import QRCodeManagement from './pages/QRCodeManagement';
 import AuditLogsPage from './pages/AuditLogsPage';
 import ReferralsCreditsPage from './pages/ReferralsCreditsPage'; // PHASE 35
+import ThemeSettingsPage from './pages/ThemeSettingsPage'; // PHASE 34
 import './App.css';
 
 function App() {
