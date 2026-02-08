@@ -1,190 +1,210 @@
-import React from 'react';
-import { useTheme } from '../hooks/useTheme';
-import { getAllThemes } from '../config/themeSystem';
+import React, { useState, useEffect } from 'react';
+import { Lock, Check, Sparkles } from 'lucide-react';
+import axios from 'axios';
+import { MASTER_THEMES, getCategoryLabel, getPlanLabel } from '../themes/masterThemes';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001/api';
 
 /**
- * ThemeSelector Component - Example Implementation
- * 
- * Demonstrates how to use the theme system with dynamic switching.
- * This is a reference implementation that can be integrated into the admin panel.
- * 
- * Features:
- * - Display all available themes
- * - Visual theme cards with colors
- * - Feature badges (Lord, Gantalu, Fire)
- * - One-click theme switching
- * - Current theme highlight
+ * PHASE 34: Theme Selector Component
+ * Visual grid for selecting master themes with plan-based gating
  */
-const ThemeSelector = ({ initialThemeId, onThemeChange }) => {
-  const { theme, themeId, switchTheme, features } = useTheme(initialThemeId);
-  const allThemes = getAllThemes();
+const ThemeSelector = ({
+  profileId,
+  currentThemeId = 'royal_heritage',
+  userPlan = 'FREE',
+  onThemeSelect,
+  onPreview
+}) => {
+  const [themes, setThemes] = useState([]);
+  const [selectedTheme, setSelectedTheme] = useState(currentThemeId);
+  const [loading, setLoading] = useState(true);
 
-  const handleThemeSelect = (newThemeId) => {
-    const success = switchTheme(newThemeId);
-    if (success && onThemeChange) {
-      onThemeChange(newThemeId);
+  useEffect(() => {
+    fetchThemes();
+  }, [userPlan]);
+
+  const fetchThemes = async () => {
+    try {
+      const response = await axios.get(`${BACKEND_URL}/themes`, {
+        params: { plan_type: userPlan }
+      });
+      setThemes(response.data.themes || []);
+    } catch (error) {
+      console.error('Error fetching themes:', error);
+      // Fallback to local themes
+      setThemes(Object.values(MASTER_THEMES));
+    } finally {
+      setLoading(false);
     }
   };
 
+  const handleThemeClick = (theme) => {
+    const isAccessible = theme.planRequired === 'FREE' || 
+      (userPlan === 'SILVER' && ['FREE', 'SILVER'].includes(theme.planRequired)) ||
+      (userPlan === 'GOLD' && ['FREE', 'SILVER', 'GOLD'].includes(theme.planRequired)) ||
+      userPlan === 'PLATINUM';
+
+    if (!isAccessible) {
+      alert(`This theme requires ${getPlanLabel(theme.planRequired)} plan or higher`);
+      return;
+    }
+
+    setSelectedTheme(theme.id);
+    if (onThemeSelect) {
+      onThemeSelect(theme.id);
+    }
+  };
+
+  const handlePreview = (theme, e) => {
+    e.stopPropagation();
+    if (onPreview) {
+      onPreview(theme);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rose-600"></div>
+      </div>
+    );
+  }
+
+  // Group themes by category
+  const themesByCategory = themes.reduce((acc, theme) => {
+    if (!acc[theme.category]) {
+      acc[theme.category] = [];
+    }
+    acc[theme.category].push(theme);
+    return acc;
+  }, {});
+
   return (
-    <div className="theme-selector-container">
-      <div className="current-theme-info">
-        <h3>Current Theme: {theme.name}</h3>
-        <div className="theme-features">
-          {features.hasLord && <span className="feature-badge">🕉️ Lord</span>}
-          {features.hasGantalu && <span className="feature-badge">🔔 Gantalu</span>}
-          {features.hasFire && <span className="feature-badge">🪔 Fire</span>}
+    <div className="space-y-8">
+      {Object.entries(themesByCategory).map(([category, categoryThemes]) => (
+        <div key={category}>
+          <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-rose-600" />
+            {getCategoryLabel(category)}
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {categoryThemes.map((theme) => {
+              const isAccessible = theme.planRequired === 'FREE' ||
+                (userPlan === 'SILVER' && ['FREE', 'SILVER'].includes(theme.planRequired)) ||
+                (userPlan === 'GOLD' && ['FREE', 'SILVER', 'GOLD'].includes(theme.planRequired)) ||
+                userPlan === 'PLATINUM';
+              
+              const isSelected = selectedTheme === theme.id;
+
+              return (
+                <div
+                  key={theme.id}
+                  onClick={() => handleThemeClick(theme)}
+                  className={`
+                    relative cursor-pointer rounded-xl overflow-hidden
+                    border-2 transition-all duration-300
+                    ${isSelected
+                      ? 'border-rose-600 shadow-xl scale-105'
+                      : isAccessible
+                        ? 'border-gray-200 hover:border-rose-400 hover:shadow-lg'
+                        : 'border-gray-200 opacity-60 cursor-not-allowed'
+                    }
+                  `}
+                >
+                  {/* Preview Image / Color Gradient */}
+                  <div
+                    className="h-32 flex items-center justify-center relative"
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.colors.primary} 0%, ${theme.colors.accent} 100%)`
+                    }}
+                  >
+                    {/* Selected Badge */}
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-lg">
+                        <Check className="w-4 h-4 text-rose-600" />
+                      </div>
+                    )}
+
+                    {/* Locked Badge */}
+                    {!isAccessible && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <div className="text-center text-white">
+                          <Lock className="w-8 h-8 mx-auto mb-2" />
+                          <span className="text-sm font-medium">{getPlanLabel(theme.planRequired)}+</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Typography Preview */}
+                    <div
+                      className="text-white text-center p-4"
+                      style={{ fontFamily: theme.typography.heading }}
+                    >
+                      <div className="text-2xl font-bold drop-shadow-lg">Aa</div>
+                      <div className="text-sm opacity-90" style={{ fontFamily: theme.typography.body }}>Wedding</div>
+                    </div>
+                  </div>
+
+                  {/* Theme Info */}
+                  <div className="p-4 bg-white">
+                    <h4 className="font-semibold text-gray-900 mb-1">{theme.name}</h4>
+                    <p className="text-sm text-gray-600 mb-3">{theme.description}</p>
+
+                    {/* Plan Badge */}
+                    <div className="flex items-center justify-between">
+                      <span className={`
+                        text-xs px-2 py-1 rounded-full
+                        ${theme.planRequired === 'FREE'
+                          ? 'bg-gray-100 text-gray-700'
+                          : theme.planRequired === 'SILVER'
+                            ? 'bg-gray-200 text-gray-800'
+                            : theme.planRequired === 'GOLD'
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-purple-100 text-purple-800'
+                        }
+                      `}>
+                        {getPlanLabel(theme.planRequired)}
+                      </span>
+
+                      {/* Preview Button */}
+                      {isAccessible && (
+                        <button
+                          onClick={(e) => handlePreview(theme, e)}
+                          className="text-xs text-rose-600 hover:text-rose-700 font-medium"
+                        >
+                          Preview
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* Current Plan Info */}
+      <div className="bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl p-6 border border-rose-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-1">Your Current Plan: {getPlanLabel(userPlan)}</h4>
+            <p className="text-sm text-gray-600">
+              {userPlan === 'PLATINUM'
+                ? 'You have access to all premium themes'
+                : `Upgrade to access more premium themes`
+              }
+            </p>
+          </div>
+          {userPlan !== 'PLATINUM' && (
+            <button className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700 transition-colors text-sm font-medium">
+              Upgrade Plan
+            </button>
+          )}
         </div>
       </div>
-
-      <div className="themes-grid">
-        {allThemes.map((t) => (
-          <div
-            key={t.themeId}
-            className={`theme-card ${themeId === t.themeId ? 'active' : ''}`}
-            onClick={() => handleThemeSelect(t.themeId)}
-            style={{
-              borderColor: t.colors.primary,
-              backgroundColor: t.backgroundColor
-            }}
-          >
-            <div className="theme-card-header">
-              <h4 style={{ color: t.colors.primary }}>{t.name}</h4>
-              {themeId === t.themeId && (
-                <span className="active-indicator">✓</span>
-              )}
-            </div>
-
-            <div className="theme-colors">
-              {t.accentColors.map((color, idx) => (
-                <div
-                  key={idx}
-                  className="color-swatch"
-                  style={{ backgroundColor: color }}
-                  title={color}
-                />
-              ))}
-            </div>
-
-            <div className="theme-features-small">
-              {t.hasLord && <span>🕉️</span>}
-              {t.hasGantalu && <span>🔔</span>}
-              {t.hasFire && <span>🪔</span>}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <style jsx>{`
-        .theme-selector-container {
-          padding: 2rem;
-          max-width: 1200px;
-          margin: 0 auto;
-        }
-
-        .current-theme-info {
-          margin-bottom: 2rem;
-          padding: 1.5rem;
-          background: var(--theme-card, #fff);
-          border-radius: 12px;
-          box-shadow: var(--theme-card-shadow);
-        }
-
-        .current-theme-info h3 {
-          margin: 0 0 1rem 0;
-          color: var(--theme-primary);
-          font-family: var(--theme-font-heading);
-        }
-
-        .theme-features {
-          display: flex;
-          gap: 0.5rem;
-          flex-wrap: wrap;
-        }
-
-        .feature-badge {
-          padding: 0.5rem 1rem;
-          background: var(--theme-accent-1);
-          color: white;
-          border-radius: 20px;
-          font-size: 0.875rem;
-          font-weight: 500;
-        }
-
-        .themes-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-          gap: 1.5rem;
-        }
-
-        .theme-card {
-          padding: 1.5rem;
-          border: 3px solid transparent;
-          border-radius: 12px;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .theme-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-        }
-
-        .theme-card.active {
-          border-width: 3px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .theme-card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 1rem;
-        }
-
-        .theme-card-header h4 {
-          margin: 0;
-          font-size: 1.125rem;
-          font-weight: 600;
-        }
-
-        .active-indicator {
-          font-size: 1.5rem;
-          color: #10b981;
-        }
-
-        .theme-colors {
-          display: flex;
-          gap: 0.5rem;
-          margin-bottom: 1rem;
-        }
-
-        .color-swatch {
-          width: 40px;
-          height: 40px;
-          border-radius: 8px;
-          border: 2px solid rgba(0, 0, 0, 0.1);
-          cursor: pointer;
-          transition: transform 0.2s;
-        }
-
-        .color-swatch:hover {
-          transform: scale(1.1);
-        }
-
-        .theme-features-small {
-          display: flex;
-          gap: 0.5rem;
-          font-size: 1.25rem;
-        }
-
-        @media (max-width: 768px) {
-          .themes-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-      `}</style>
     </div>
   );
 };
