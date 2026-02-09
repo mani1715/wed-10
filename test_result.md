@@ -102,6 +102,343 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
+# ============================================================================
+# PHASE 35 (NEW): SUPER ADMIN & CREDIT FOUNDATION SYSTEM - FULLY IMPLEMENTED
+# ============================================================================
+
+user_problem_statement_phase35_new: |
+  IMPLEMENT PHASE 35 – SUPER ADMIN & CREDIT FOUNDATION SYSTEM
+  
+  SYSTEM ROLES:
+  1. SUPER ADMIN (Platform Owner – Full Control)
+  2. ADMIN (Photographer – Limited to their own data)
+  
+  Core Requirements:
+  - Super Admin can create/manage Admin (Photographer) accounts
+  - Super Admin can add/deduct credits for any Admin
+  - Credits are global per Admin (not per wedding)
+  - Credits do not expire until used
+  - Complete credit ledger for audit trail
+  - Strict role-based access control (RBAC)
+  - No payment gateway, no design logic (foundation only)
+
+backend:
+  - task: "PHASE 35 NEW: Admin Role & Status Enums"
+    implemented: true
+    working: true
+    file: "backend/models.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "AdminRole enum (SUPER_ADMIN, ADMIN) and AdminStatus enum (ACTIVE, SUSPENDED, INACTIVE) implemented. Lines 499-510 in models.py."
+
+  - task: "PHASE 35 NEW: Enhanced Admin Model with Credit Fields"
+    implemented: true
+    working: true
+    file: "backend/models.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Admin model enhanced with role, status, total_credits, used_credits, created_by fields. Property available_credits calculates remaining credits. Lines 512-531 in models.py."
+
+  - task: "PHASE 35 NEW: CreditLedger Model"
+    implemented: true
+    working: true
+    file: "backend/models.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "CreditLedger model with credit_id, admin_id, action_type (ADD/DEDUCT), amount, reason, related_wedding_id, performed_by, balance_after, metadata, created_at. Immutable audit trail. Line 598 in models.py."
+
+  - task: "PHASE 35 NEW: Role-Based Authentication Middleware"
+    implemented: true
+    working: true
+    file: "backend/auth.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Role-based auth implemented: get_current_admin_with_role(), require_super_admin(), require_admin(). JWT tokens include role field. Super Admin access enforced at middleware level."
+
+  - task: "PHASE 35 NEW: Super Admin - Create Admin Account API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "POST /api/super-admin/admins endpoint creates Admin accounts with name, email, password, initial_credits. Validates email uniqueness. Creates ledger entry for initial credits. Line 631 in server.py."
+
+  - task: "PHASE 35 NEW: Super Admin - List All Admins API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "GET /api/super-admin/admins endpoint lists all photographer admins with credit details (total, used, available). Excludes Super Admins from list. Line 684 in server.py."
+
+  - task: "PHASE 35 NEW: Super Admin - Add Credits API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "POST /api/super-admin/credits/add endpoint allows Super Admin to add credits to any Admin. Mandatory reason field. Creates immutable ledger entry. Line 718 in server.py."
+
+  - task: "PHASE 35 NEW: Super Admin - Deduct Credits API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "POST /api/super-admin/credits/deduct endpoint allows Super Admin to deduct credits from any Admin. Mandatory reason field. Validates sufficient balance. Creates immutable ledger entry. Line 752 in server.py."
+
+  - task: "PHASE 35 NEW: Super Admin - View Credit Ledger API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "GET /api/super-admin/credits/ledger/{admin_id} endpoint returns complete credit transaction history for any Admin. Read-only immutable ledger. Line 786 in server.py."
+
+  - task: "PHASE 35 NEW: Super Admin - Update Admin Status API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "PUT /api/super-admin/admins/{admin_id}/status endpoint allows Super Admin to activate/suspend Admin accounts. Cannot modify Super Admin status. Line 833 in server.py."
+
+  - task: "PHASE 35 NEW: Super Admin Initialization Script"
+    implemented: true
+    working: true
+    file: "backend/init_super_admin.py"
+    stuck_count: 0
+    priority: "critical"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "init_super_admin.py creates default Super Admin account (superadmin@wedding.com / SuperAdmin@123). Checks for existing account. Sets unlimited credits (999999). Script executed successfully."
+
+  - task: "PHASE 35 NEW: Admin Get Own Credits API"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "GET /api/auth/me endpoint returns AdminResponse including role, status, total_credits, used_credits, available_credits. Regular Admins can view their own credits (read-only). Line 618 in server.py."
+
+frontend:
+  - task: "PHASE 35 NEW: Super Admin Login Page"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/SuperAdminLogin.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "SuperAdminLogin page with purple gradient design. Uses AuthContext login. Redirects to /super-admin/dashboard on successful login. Link to regular admin login included."
+
+  - task: "PHASE 35 NEW: Super Admin Dashboard"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/SuperAdminDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Complete Super Admin dashboard with admin list table showing name, email, status, credit balance (total/used/available). Actions: Add credits, Deduct credits, View ledger, Activate/Suspend. Role check prevents regular admin access."
+
+  - task: "PHASE 35 NEW: Create Admin Modal"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/SuperAdminDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Modal for creating new Admin accounts. Fields: name, email, password (min 8 chars), initial_credits. Form validation and error handling. Lines 274-340 in SuperAdminDashboard.jsx."
+
+  - task: "PHASE 35 NEW: Credit Operation Modal"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/SuperAdminDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Modal for adding/deducting credits. Fields: amount, reason (mandatory textarea). Action toggle (add/deduct). Colored buttons (green for add, red for deduct). Lines 342-393 in SuperAdminDashboard.jsx."
+
+  - task: "PHASE 35 NEW: Credit Ledger Modal"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/SuperAdminDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Modal displaying credit transaction history table. Columns: Date, Action (with badge), Amount (+/-), Balance After, Reason. Scrollable table for large ledgers. Lines 395-450 in SuperAdminDashboard.jsx."
+
+  - task: "PHASE 35 NEW: Admin Credit Balance Display"
+    implemented: true
+    working: true
+    file: "frontend/src/pages/AdminDashboard.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Credit balance badge added to regular Admin dashboard header. Shows available credits with sparkles icon. Displays total/used credits in small text. Read-only, only visible for role='admin'. Lines 275-285 in AdminDashboard.jsx."
+
+  - task: "PHASE 35 NEW: App.js Routing for Super Admin"
+    implemented: true
+    working: true
+    file: "frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Added routes: /super-admin/login (SuperAdminLogin) and /super-admin/dashboard (SuperAdminDashboard). Imports added. Routes organized with comments separating Super Admin, Regular Admin, and Public routes."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "PHASE 35 NEW: Test Super Admin login flow"
+    - "PHASE 35 NEW: Test Admin account creation"
+    - "PHASE 35 NEW: Test credit addition/deduction"
+    - "PHASE 35 NEW: Test credit ledger viewing"
+    - "PHASE 35 NEW: Test Admin status management"
+    - "PHASE 35 NEW: Test role-based access control"
+    - "PHASE 35 NEW: Test Admin credit balance display"
+    - "PHASE 35 NEW: Verify ledger immutability"
+    - "PHASE 35 NEW: Verify regular Admin cannot access Super Admin routes"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: |
+        PHASE 35 (NEW) - SUPER ADMIN & CREDIT FOUNDATION SYSTEM - FULLY IMPLEMENTED
+        
+        Backend Implementation (100% Complete):
+        ✅ AdminRole enum (SUPER_ADMIN, ADMIN)
+        ✅ AdminStatus enum (ACTIVE, SUSPENDED, INACTIVE)
+        ✅ Admin model with credit fields (total_credits, used_credits, available_credits)
+        ✅ CreditLedger model (immutable audit trail)
+        ✅ Role-based authentication middleware (require_super_admin, require_admin)
+        ✅ Super Admin initialization script (superadmin@wedding.com / SuperAdmin@123)
+        ✅ 5 Super Admin API endpoints:
+          - POST /api/super-admin/admins (create admin)
+          - GET /api/super-admin/admins (list all admins)
+          - POST /api/super-admin/credits/add (add credits)
+          - POST /api/super-admin/credits/deduct (deduct credits)
+          - GET /api/super-admin/credits/ledger/{admin_id} (view ledger)
+          - PUT /api/super-admin/admins/{admin_id}/status (update status)
+        ✅ Enhanced /api/auth/me to return role and credit info
+        
+        Frontend Implementation (100% Complete):
+        ✅ SuperAdminLogin page with purple gradient design
+        ✅ SuperAdminDashboard with admin management table
+        ✅ Create Admin modal (name, email, password, initial_credits)
+        ✅ Credit operation modal (add/deduct with mandatory reason)
+        ✅ Credit ledger modal (transaction history table)
+        ✅ Admin credit balance display in AdminDashboard header
+        ✅ App.js routing for /super-admin/login and /super-admin/dashboard
+        ✅ Role-based UI access control
+        
+        Security & Credit System Features:
+        ✅ Strict RBAC - Super Admin and Admin roles enforced at API level
+        ✅ Credits are global per Admin (not per wedding)
+        ✅ Credits do not expire until used
+        ✅ Immutable credit ledger for audit trail
+        ✅ Mandatory reason for all credit operations
+        ✅ Balance validation before deduction
+        ✅ Super Admin cannot modify their own or other Super Admin status
+        ✅ Regular Admins see credits read-only
+        ✅ JWT tokens include role for authorization
+        
+        Default Super Admin Credentials:
+        Email: superadmin@wedding.com
+        Password: SuperAdmin@123
+        
+        Foundation for Future Features:
+        ✅ Ready for design-based credit deduction
+        ✅ Ready for auto-deduction on publish
+        ✅ Ready for payment-based credit purchases
+        ✅ Ready for God/No-God design pricing
+        
+        Ready for Testing:
+        - Super Admin login and dashboard access
+        - Admin account creation with initial credits
+        - Credit add/deduct operations with ledger entries
+        - Credit balance display for regular admins
+        - Role-based access enforcement
+        - Ledger viewing and immutability
+        - Admin status management (activate/suspend)
+
+
+# ============================================================================
+# ORIGINAL PHASE 35: REFERRAL, CREDITS & VIRAL GROWTH ENGINE (SEPARATE SYSTEM)
+# ============================================================================
+
 user_problem_statement: |
   IMPLEMENT PHASE 33 – MONETIZATION & PREMIUM PLANS
   Add a clean, non-intrusive monetization system with feature gating.
