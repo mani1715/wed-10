@@ -147,6 +147,8 @@ from template_validator import (
     calculate_performance_score,
     TemplateValidationError
 )
+# PHASE 35: Credit Management Service
+from credit_service import CreditService
 import hashlib
 
 
