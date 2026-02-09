@@ -98,7 +98,8 @@ from models import (
 )
 from auth import (
     get_password_hash, verify_password, 
-    create_access_token, get_current_admin
+    create_access_token, get_current_admin,
+    get_current_admin_with_role, require_super_admin, require_admin
 )
 from design_registry import (
     get_all_designs, get_designs_by_event_type, 
