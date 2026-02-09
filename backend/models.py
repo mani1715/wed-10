@@ -492,13 +492,42 @@ class EventInvitationResponse(BaseModel):
     updated_at: datetime
 
 
+# ==========================================
+# PHASE 35: SUPER ADMIN & CREDIT SYSTEM
+# ==========================================
+
+class AdminRole(str, Enum):
+    """Admin roles for role-based access control"""
+    SUPER_ADMIN = "super_admin"  # Platform owner - full control
+    ADMIN = "admin"  # Photographer - limited to own data
+
+
+class AdminStatus(str, Enum):
+    """Admin account status"""
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    INACTIVE = "inactive"
+
+
 class Admin(BaseModel):
+    """Enhanced Admin model with role and credit fields"""
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     email: str
     password_hash: str
+    name: str  # PHASE 35: Admin name
+    role: AdminRole = AdminRole.ADMIN  # PHASE 35: Role (super_admin or admin)
+    status: AdminStatus = AdminStatus.ACTIVE  # PHASE 35: Account status
+    total_credits: int = 0  # PHASE 35: Total credits assigned
+    used_credits: int = 0  # PHASE 35: Credits used
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: Optional[str] = None  # PHASE 35: Super admin who created this account
+    
+    @property
+    def available_credits(self) -> int:
+        """Calculate available credits"""
+        return self.total_credits - self.used_credits
 
 
 class AdminLogin(BaseModel):
@@ -507,9 +536,144 @@ class AdminLogin(BaseModel):
 
 
 class AdminResponse(BaseModel):
+    """Response model for Admin data"""
     id: str
     email: str
+    name: str
+    role: AdminRole
+    status: AdminStatus
+    total_credits: int
+    used_credits: int
+    available_credits: int
     created_at: datetime
+    created_by: Optional[str] = None
+
+
+class AdminRegister(BaseModel):
+    """PHASE 35: Request to create a new Admin (only by Super Admin)"""
+    email: str
+    password: str
+    name: str
+    initial_credits: int = 0
+    
+    @field_validator('email')
+    def validate_email(cls, v):
+        """Validate email format"""
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        if not re.match(pattern, v):
+            raise ValueError('Invalid email format')
+        return v
+    
+    @field_validator('password')
+    def validate_password(cls, v):
+        """Validate password strength"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return v
+    
+    @field_validator('name')
+    def validate_name(cls, v):
+        """Validate name is not empty"""
+        if not v or not v.strip():
+            raise ValueError('Name cannot be empty')
+        return v.strip()
+    
+    @field_validator('initial_credits')
+    def validate_initial_credits(cls, v):
+        """Validate initial credits is non-negative"""
+        if v < 0:
+            raise ValueError('Initial credits cannot be negative')
+        return v
+
+
+class CreditActionType(str, Enum):
+    """Types of credit transactions"""
+    ADD = "add"  # Credits added by Super Admin
+    DEDUCT = "deduct"  # Credits deducted by Super Admin (manual)
+    USED = "used"  # Credits used on publish action
+    ADJUST = "adjust"  # Manual adjustment by Super Admin
+    REFUND = "refund"  # Credits refunded (e.g., unpublish)
+
+
+class CreditLedger(BaseModel):
+    """PHASE 35: Immutable credit transaction ledger"""
+    model_config = ConfigDict(extra="ignore")
+    
+    credit_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    admin_id: str  # Admin whose credits are affected
+    action_type: CreditActionType  # Type of transaction
+    amount: int  # Positive for add/refund, negative for deduct/used
+    balance_before: int  # Total credits before transaction
+    balance_after: int  # Total credits after transaction
+    reason: str  # Mandatory reason for transaction
+    related_wedding_id: Optional[str] = None  # Wedding/profile related to transaction
+    performed_by: str  # Super Admin ID who performed the action
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    metadata: Optional[Dict[str, Any]] = None  # Additional metadata
+
+
+class CreditLedgerResponse(BaseModel):
+    """Response model for credit ledger"""
+    credit_id: str
+    admin_id: str
+    action_type: CreditActionType
+    amount: int
+    balance_before: int
+    balance_after: int
+    reason: str
+    related_wedding_id: Optional[str]
+    performed_by: str
+    created_at: datetime
+    metadata: Optional[Dict[str, Any]]
+
+
+class AddCreditsRequest(BaseModel):
+    """PHASE 35: Request to add credits to an Admin"""
+    admin_id: str
+    amount: int
+    reason: str
+    
+    @field_validator('amount')
+    def validate_amount(cls, v):
+        """Validate amount is positive"""
+        if v <= 0:
+            raise ValueError('Amount must be positive')
+        return v
+    
+    @field_validator('reason')
+    def validate_reason(cls, v):
+        """Validate reason is not empty"""
+        if not v or not v.strip():
+            raise ValueError('Reason cannot be empty')
+        return v.strip()
+
+
+class DeductCreditsRequest(BaseModel):
+    """PHASE 35: Request to deduct credits from an Admin"""
+    admin_id: str
+    amount: int
+    reason: str
+    
+    @field_validator('amount')
+    def validate_amount(cls, v):
+        """Validate amount is positive"""
+        if v <= 0:
+            raise ValueError('Amount must be positive')
+        return v
+    
+    @field_validator('reason')
+    def validate_reason(cls, v):
+        """Validate reason is not empty"""
+        if not v or not v.strip():
+            raise ValueError('Reason cannot be empty')
+        return v.strip()
+
+
+class CreditBalanceResponse(BaseModel):
+    """Response model for credit balance"""
+    total_credits: int
+    used_credits: int
+    available_credits: int
 
 
 class SectionsEnabled(BaseModel):
