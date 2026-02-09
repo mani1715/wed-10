@@ -740,6 +740,7 @@ class Profile(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    admin_id: str  # PHASE 35: Owner admin/photographer ID (for data isolation)
     slug: str  # Unique link identifier
     groom_name: str
     bride_name: str
