@@ -269,7 +269,20 @@ const AdminDashboard = () => {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
-              <p className="text-sm text-gray-600">Welcome, {admin?.email}</p>
+              <p className="text-sm text-gray-600">Welcome, {admin?.name || admin?.email}</p>
+              
+              {/* PHASE 35: Credit Balance Display */}
+              {admin?.role === 'admin' && (
+                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
+                  <Sparkles className="w-4 h-4 text-purple-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Credits: <span className="text-purple-700 font-bold">{admin?.available_credits || 0}</span>
+                  </span>
+                  <span className="text-xs text-gray-500">
+                    ({admin?.total_credits || 0} total / {admin?.used_credits || 0} used)
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               <Button
