@@ -298,6 +298,41 @@ def calculate_invitation_expires_at(event_date: datetime, expires_at: Optional[d
 
 async def check_profile_active(profile: dict) -> bool:
     """Check if profile is active and not expired"""
+
+
+# PHASE 35: Data Isolation Helper
+def build_isolation_query(base_query: dict, admin_data: dict) -> dict:
+    """
+    Build query with data isolation for multi-tenant architecture
+    Super Admin can access all data, regular Admins only their own
+    """
+    query = base_query.copy()
+    
+    # Super Admin bypass - can access all data
+    if admin_data['role'] == 'super_admin':
+        return query
+    
+    # Regular Admin - enforce data isolation
+    query['admin_id'] = admin_data['admin_id']
+    return query
+
+
+async def check_profile_ownership(profile_id: str, admin_data: dict, db) -> dict:
+    """
+    Check if admin owns the profile (or is Super Admin)
+    Returns profile if authorized, raises 404 if not found or unauthorized
+    """
+    query = build_isolation_query({"id": profile_id}, admin_data)
+    profile = await db.profiles.find_one(query, {"_id": 0})
+    
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    return profile
+
+
+async def check_profile_active_old(profile: dict) -> bool:
+    """Check if profile is active and not expired"""
     if not profile.get('is_active', True):
         return False
     
