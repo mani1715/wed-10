@@ -1078,10 +1078,18 @@ async def get_profile(profile_id: str, admin_data: dict = Depends(require_admin)
 async def update_profile(
     profile_id: str,
     update_data: ProfileUpdate,
-    admin_id: str = Depends(get_current_admin)
+    admin_data: dict = Depends(require_admin)
 ):
-    """Update profile"""
-    existing_profile = await db.profiles.find_one({"id": profile_id}, {"_id": 0})
+    """Update profile - PHASE 35: Data isolation enforced"""
+    admin_id = admin_data['admin_id']
+    role = admin_data['role']
+    
+    # PHASE 35: Data isolation query
+    query = {"id": profile_id}
+    if role != 'super_admin':
+        query['admin_id'] = admin_id
+    
+    existing_profile = await db.profiles.find_one(query, {"_id": 0})
     
     if not existing_profile:
         raise HTTPException(status_code=404, detail="Profile not found")
