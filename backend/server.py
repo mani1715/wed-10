@@ -1217,13 +1217,12 @@ async def update_profile(
 
 
 @api_router.delete("/admin/profiles/{profile_id}")
-async def delete_profile(profile_id: str, admin_id: str = Depends(get_current_admin)):
-    """Delete profile (soft delete)"""
-    # Get profile before deletion for audit log
-    profile = await db.profiles.find_one({"id": profile_id}, {"_id": 0})
+async def delete_profile(profile_id: str, admin_data: dict = Depends(require_admin)):
+    """Delete profile (soft delete) - PHASE 35: Data isolation enforced"""
+    admin_id = admin_data['admin_id']
     
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+    # PHASE 35: Check ownership
+    profile = await check_profile_ownership(profile_id, admin_data, db)
     
     result = await db.profiles.update_one(
         {"id": profile_id},
@@ -1251,16 +1250,16 @@ async def delete_profile(profile_id: str, admin_id: str = Depends(get_current_ad
 
 # PHASE 32: Admin Action Security - Disable/Enable/Expire Invitation Endpoints
 @api_router.put("/admin/profiles/{profile_id}/disable")
-async def disable_profile(profile_id: str, admin_id: str = Depends(get_current_admin)):
+async def disable_profile(profile_id: str, admin_data: dict = Depends(require_admin)):
     """
-    PHASE 32: Disable invitation (make it inaccessible)
+    PHASE 32: Disable invitation (make it inaccessible) - PHASE 35: Data isolation enforced
     Guests cannot view the invitation when disabled
     Can be re-enabled later
     """
-    profile = await db.profiles.find_one({"id": profile_id}, {"_id": 0})
+    admin_id = admin_data['admin_id']
     
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
+    # PHASE 35: Check ownership
+    profile = await check_profile_ownership(profile_id, admin_data, db)
     
     result = await db.profiles.update_one(
         {"id": profile_id},
