@@ -1039,9 +1039,17 @@ async def create_profile(profile_data: ProfileCreate, admin_data: dict = Depends
 
 
 @api_router.get("/admin/profiles/{profile_id}", response_model=ProfileResponse)
-async def get_profile(profile_id: str, admin_id: str = Depends(get_current_admin)):
-    """Get single profile"""
-    profile = await db.profiles.find_one({"id": profile_id}, {"_id": 0})
+async def get_profile(profile_id: str, admin_data: dict = Depends(require_admin)):
+    """Get single profile - PHASE 35: Data isolation enforced"""
+    admin_id = admin_data['admin_id']
+    role = admin_data['role']
+    
+    # PHASE 35: Data isolation query
+    query = {"id": profile_id}
+    if role != 'super_admin':
+        query['admin_id'] = admin_id
+    
+    profile = await db.profiles.find_one(query, {"_id": 0})
     
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
