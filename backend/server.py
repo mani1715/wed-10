@@ -943,8 +943,10 @@ async def get_all_profiles(admin_data: dict = Depends(require_admin)):
 
 
 @api_router.post("/admin/profiles", response_model=ProfileResponse)
-async def create_profile(profile_data: ProfileCreate, admin_id: str = Depends(get_current_admin)):
-    """Create new profile"""
+async def create_profile(profile_data: ProfileCreate, admin_data: dict = Depends(require_admin)):
+    """Create new profile - PHASE 35: Auto-assign admin_id"""
+    admin_id = admin_data['admin_id']
+    
     # Generate unique slug
     slug = generate_slug(profile_data.groom_name, profile_data.bride_name)
     
@@ -971,6 +973,7 @@ async def create_profile(profile_data: ProfileCreate, admin_id: str = Depends(ge
     
     # Create profile object
     profile = Profile(
+        admin_id=admin_id,  # PHASE 35: Owner admin ID
         slug=slug,
         groom_name=profile_data.groom_name,
         bride_name=profile_data.bride_name,
