@@ -161,6 +161,9 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# PHASE 35: Initialize Credit Service
+credit_service = CreditService(db)
+
 # PHASE 34: Razorpay Payment Gateway Client
 RAZORPAY_KEY_ID = os.environ.get('RAZORPAY_KEY_ID', 'rzp_test_PLACEHOLDER_KEY_ID')
 RAZORPAY_KEY_SECRET = os.environ.get('RAZORPAY_KEY_SECRET', 'PLACEHOLDER_SECRET_KEY')
