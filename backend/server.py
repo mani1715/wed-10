@@ -591,6 +591,320 @@ async def get_current_admin_info(admin_id: str = Depends(get_current_admin)):
     return AdminResponse(**admin)
 
 
+# ==================== PHASE 35: SUPER ADMIN ROUTES ====================
+
+@api_router.post("/super-admin/admins", response_model=AdminResponse)
+async def create_admin_account(
+    admin_data: AdminRegister,
+    super_admin_id: str = Depends(require_super_admin)
+):
+    """PHASE 35: Create a new Admin (Photographer) account - Super Admin only"""
+    
+    # Check if email already exists
+    existing_admin = await db.admins.find_one({"email": admin_data.email})
+    if existing_admin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Create new admin
+    new_admin = Admin(
+        email=admin_data.email,
+        password_hash=get_password_hash(admin_data.password),
+        name=admin_data.name,
+        role=AdminRole.ADMIN,  # Always create as regular Admin
+        status=AdminStatus.ACTIVE,
+        total_credits=admin_data.initial_credits,
+        used_credits=0,
+        created_by=super_admin_id
+    )
+    
+    await db.admins.insert_one(new_admin.model_dump())
+    
+    # Create ledger entry if initial credits > 0
+    if admin_data.initial_credits > 0:
+        await credit_service.add_credits(
+            admin_id=new_admin.id,
+            amount=admin_data.initial_credits,
+            reason="Initial credits on account creation",
+            performed_by=super_admin_id,
+            metadata={"event": "account_creation"}
+        )
+    
+    return AdminResponse(
+        id=new_admin.id,
+        email=new_admin.email,
+        name=new_admin.name,
+        role=new_admin.role,
+        status=new_admin.status,
+        total_credits=new_admin.total_credits,
+        used_credits=new_admin.used_credits,
+        available_credits=new_admin.available_credits,
+        created_at=new_admin.created_at,
+        created_by=new_admin.created_by
+    )
+
+
+@api_router.get("/super-admin/admins", response_model=List[AdminResponse])
+async def get_all_admins(
+    super_admin_id: str = Depends(require_super_admin),
+    status_filter: Optional[str] = None
+):
+    """PHASE 35: Get all Admin accounts - Super Admin only"""
+    
+    # Build filter
+    query = {"role": AdminRole.ADMIN.value}  # Exclude other Super Admins
+    if status_filter:
+        query["status"] = status_filter
+    
+    # Get all admins
+    admins = await db.admins.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    
+    # Format response
+    admin_list = []
+    for admin in admins:
+        admin_list.append(AdminResponse(
+            id=admin['id'],
+            email=admin['email'],
+            name=admin.get('name', admin['email']),
+            role=admin.get('role', AdminRole.ADMIN.value),
+            status=admin.get('status', AdminStatus.ACTIVE.value),
+            total_credits=admin.get('total_credits', 0),
+            used_credits=admin.get('used_credits', 0),
+            available_credits=admin.get('total_credits', 0) - admin.get('used_credits', 0),
+            created_at=admin['created_at'],
+            created_by=admin.get('created_by')
+        ))
+    
+    return admin_list
+
+
+@api_router.post("/super-admin/credits/add")
+async def add_credits_to_admin(
+    request: AddCreditsRequest,
+    super_admin_id: str = Depends(require_super_admin)
+):
+    """PHASE 35: Add credits to an Admin account - Super Admin only"""
+    
+    try:
+        result = await credit_service.add_credits(
+            admin_id=request.admin_id,
+            amount=request.amount,
+            reason=request.reason,
+            performed_by=super_admin_id,
+            metadata={"action": "super_admin_add"}
+        )
+        
+        return {
+            "success": True,
+            "message": f"Successfully added {request.amount} credits",
+            **result
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add credits: {str(e)}"
+        )
+
+
+@api_router.post("/super-admin/credits/deduct")
+async def deduct_credits_from_admin(
+    request: DeductCreditsRequest,
+    super_admin_id: str = Depends(require_super_admin)
+):
+    """PHASE 35: Deduct credits from an Admin account - Super Admin only"""
+    
+    try:
+        result = await credit_service.deduct_credits(
+            admin_id=request.admin_id,
+            amount=request.amount,
+            reason=request.reason,
+            performed_by=super_admin_id,
+            metadata={"action": "super_admin_deduct"}
+        )
+        
+        return {
+            "success": True,
+            "message": f"Successfully deducted {request.amount} credits",
+            **result
+        }
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to deduct credits: {str(e)}"
+        )
+
+
+@api_router.get("/super-admin/credits/ledger/{admin_id}", response_model=List[CreditLedgerResponse])
+async def get_admin_credit_ledger(
+    admin_id: str,
+    super_admin_id: str = Depends(require_super_admin),
+    limit: int = 100,
+    skip: int = 0
+):
+    """PHASE 35: Get credit transaction history for an Admin - Super Admin only"""
+    
+    try:
+        result = await credit_service.get_credit_ledger(
+            admin_id=admin_id,
+            limit=limit,
+            skip=skip
+        )
+        
+        # Convert to response model
+        ledger_entries = []
+        for entry in result['entries']:
+            ledger_entries.append(CreditLedgerResponse(
+                credit_id=entry['credit_id'],
+                admin_id=entry['admin_id'],
+                action_type=entry['action_type'],
+                amount=entry['amount'],
+                balance_before=entry['balance_before'],
+                balance_after=entry['balance_after'],
+                reason=entry['reason'],
+                related_wedding_id=entry.get('related_wedding_id'),
+                performed_by=entry['performed_by'],
+                created_at=entry['created_at'],
+                metadata=entry.get('metadata')
+            ))
+        
+        return ledger_entries
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve ledger: {str(e)}"
+        )
+
+
+@api_router.put("/super-admin/admins/{admin_id}/status")
+async def update_admin_status(
+    admin_id: str,
+    status: AdminStatus,
+    super_admin_id: str = Depends(require_super_admin)
+):
+    """PHASE 35: Update Admin account status - Super Admin only"""
+    
+    # Check if admin exists
+    admin = await db.admins.find_one({"id": admin_id})
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin not found"
+        )
+    
+    # Prevent modifying Super Admin accounts
+    if admin.get('role') == AdminRole.SUPER_ADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot modify Super Admin accounts"
+        )
+    
+    # Update status
+    await db.admins.update_one(
+        {"id": admin_id},
+        {"$set": {"status": status.value}}
+    )
+    
+    return {
+        "success": True,
+        "message": f"Admin status updated to {status.value}",
+        "admin_id": admin_id,
+        "new_status": status.value
+    }
+
+
+# ==================== PHASE 35: ADMIN CREDIT ROUTES ====================
+
+@api_router.get("/admin/credits", response_model=CreditBalanceResponse)
+async def get_own_credit_balance(admin_data: dict = Depends(require_admin)):
+    """PHASE 35: Get own credit balance - Read-only for Admins"""
+    
+    try:
+        balance = await credit_service.get_credit_balance(admin_data['admin_id'])
+        
+        return CreditBalanceResponse(
+            total_credits=balance['total_credits'],
+            used_credits=balance['used_credits'],
+            available_credits=balance['available_credits']
+        )
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve balance: {str(e)}"
+        )
+
+
+@api_router.get("/admin/credits/ledger", response_model=List[CreditLedgerResponse])
+async def get_own_credit_ledger(
+    admin_data: dict = Depends(require_admin),
+    limit: int = 50,
+    skip: int = 0
+):
+    """PHASE 35: Get own credit transaction history - Admins can view their own ledger"""
+    
+    try:
+        result = await credit_service.get_credit_ledger(
+            admin_id=admin_data['admin_id'],
+            limit=limit,
+            skip=skip
+        )
+        
+        # Convert to response model
+        ledger_entries = []
+        for entry in result['entries']:
+            ledger_entries.append(CreditLedgerResponse(
+                credit_id=entry['credit_id'],
+                admin_id=entry['admin_id'],
+                action_type=entry['action_type'],
+                amount=entry['amount'],
+                balance_before=entry['balance_before'],
+                balance_after=entry['balance_after'],
+                reason=entry['reason'],
+                related_wedding_id=entry.get('related_wedding_id'),
+                performed_by=entry['performed_by'],
+                created_at=entry['created_at'],
+                metadata=entry.get('metadata')
+            ))
+        
+        return ledger_entries
+    
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve ledger: {str(e)}"
+        )
+
+
 # ==================== ADMIN - PROFILE ROUTES ====================
 
 @api_router.get("/admin/profiles", response_model=List[ProfileResponse])
