@@ -538,7 +538,7 @@ def contains_profanity(text: str) -> bool:
 
 @api_router.post("/auth/login")
 async def login(login_data: AdminLogin):
-    """Admin login endpoint"""
+    """Admin login endpoint - supports both Super Admin and Admin"""
     admin = await db.admins.find_one({"email": login_data.email}, {"_id": 0})
     
     if not admin or not verify_password(login_data.password, admin['password_hash']):
@@ -547,14 +547,35 @@ async def login(login_data: AdminLogin):
             detail="Incorrect email or password"
         )
     
-    access_token = create_access_token(data={"sub": admin['id']})
+    # PHASE 35: Check account status
+    if admin.get('status') == AdminStatus.SUSPENDED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account suspended. Please contact support."
+        )
+    
+    if admin.get('status') == AdminStatus.INACTIVE.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account inactive. Please contact support."
+        )
+    
+    # PHASE 35: Include role in token
+    access_token = create_access_token(data={
+        "sub": admin['id'],
+        "role": admin.get('role', AdminRole.ADMIN.value)
+    })
     
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "admin": {
             "id": admin['id'],
-            "email": admin['email']
+            "email": admin['email'],
+            "name": admin.get('name', admin['email']),
+            "role": admin.get('role', AdminRole.ADMIN.value),
+            "status": admin.get('status', AdminStatus.ACTIVE.value),
+            "available_credits": admin.get('total_credits', 0) - admin.get('used_credits', 0)
         }
     }
 
