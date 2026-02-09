@@ -908,10 +908,17 @@ async def get_own_credit_ledger(
 # ==================== ADMIN - PROFILE ROUTES ====================
 
 @api_router.get("/admin/profiles", response_model=List[ProfileResponse])
-async def get_all_profiles(admin_id: str = Depends(get_current_admin)):
-    """Get all profiles (excluding templates)"""
-    # Only get non-template profiles
-    profiles = await db.profiles.find({"is_template": {"$ne": True}}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+async def get_all_profiles(admin_data: dict = Depends(require_admin)):
+    """Get all profiles (excluding templates) - PHASE 35: Data isolation enforced"""
+    admin_id = admin_data['admin_id']
+    role = admin_data['role']
+    
+    # PHASE 35: Data isolation - Admins see only their data, Super Admin sees all
+    query = {"is_template": {"$ne": True}}
+    if role != 'super_admin':
+        query['admin_id'] = admin_id
+    
+    profiles = await db.profiles.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
     
     # Convert date strings back to datetime
     for profile in profiles:
