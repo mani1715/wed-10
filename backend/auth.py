@@ -45,6 +45,7 @@ def decode_access_token(token: str):
 
 
 async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current admin from token (works for both Super Admin and Admin)"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Could not validate credentials',
@@ -62,3 +63,45 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
         raise credentials_exception
     
     return admin_id
+
+
+async def get_current_admin_with_role(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """PHASE 35: Get current admin with role information"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail='Could not validate credentials',
+        headers={'WWW-Authenticate': 'Bearer'},
+    )
+    
+    token = credentials.credentials
+    payload = decode_access_token(token)
+    
+    if payload is None:
+        raise credentials_exception
+    
+    admin_id: str = payload.get('sub')
+    role: str = payload.get('role')
+    
+    if admin_id is None or role is None:
+        raise credentials_exception
+    
+    return {'admin_id': admin_id, 'role': role}
+
+
+async def require_super_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """PHASE 35: Middleware to ensure only Super Admin can access"""
+    admin_data = await get_current_admin_with_role(credentials)
+    
+    if admin_data['role'] != 'super_admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Super Admin access required'
+        )
+    
+    return admin_data['admin_id']
+
+
+async def require_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """PHASE 35: Middleware to ensure authenticated admin (Super Admin or Admin)"""
+    admin_data = await get_current_admin_with_role(credentials)
+    return admin_data
