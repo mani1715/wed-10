@@ -22,10 +22,10 @@ async def init_super_admin():
     db = client[db_name]
     admins_collection = db['admins']
     
-    # Super Admin credentials
-    SUPER_ADMIN_EMAIL = "superadmin@wedding.com"
-    SUPER_ADMIN_PASSWORD = "SuperAdmin@123"  # Change this in production!
-    SUPER_ADMIN_NAME = "Platform Owner"
+    # Super Admin credentials from environment variables
+    SUPER_ADMIN_EMAIL = os.environ.get('SUPER_ADMIN_EMAIL', 'superadmin@wedding.com')
+    SUPER_ADMIN_PASSWORD = os.environ.get('SUPER_ADMIN_PASSWORD', 'SuperAdmin@123')
+    SUPER_ADMIN_NAME = os.environ.get('SUPER_ADMIN_NAME', 'Platform Owner')
     
     # Check if Super Admin already exists
     existing_super_admin = await admins_collection.find_one({
