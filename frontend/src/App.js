@@ -16,8 +16,10 @@ import WishesManagement from './pages/WishesManagement';
 import PostWeddingManagement from './pages/PostWeddingManagement';
 import QRCodeManagement from './pages/QRCodeManagement';
 import AuditLogsPage from './pages/AuditLogsPage';
-import ReferralsCreditsPage from './pages/ReferralsCreditsPage'; // PHASE 35
+import ReferralsCreditsPage from './pages/ReferralsCreditsPage'; // PHASE 35 - Referral System
 import ThemeSettingsPage from './pages/ThemeSettingsPage'; // PHASE 34
+import SuperAdminLogin from './pages/SuperAdminLogin'; // PHASE 35 - Super Admin System
+import SuperAdminDashboard from './pages/SuperAdminDashboard'; // PHASE 35 - Super Admin System
 import './App.css';
 
 function App() {
@@ -29,6 +31,12 @@ function App() {
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<LandingPage />} />
+                
+                {/* PHASE 35: Super Admin Routes */}
+                <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+                <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
+                
+                {/* Regular Admin Routes */}
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/admin/profile/new" element={<ProfileForm />} />
@@ -42,6 +50,8 @@ function App() {
                 <Route path="/admin/profile/:profileId/referrals" element={<ReferralsCreditsPage />} />
                 <Route path="/admin/profile/:profileId/theme-settings" element={<ThemeSettingsPage />} />
                 <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+                
+                {/* Public Routes */}
                 <Route path="/invite/:slug/:eventType" element={<PublicInvitation />} />
                 <Route path="/invite/:slug" element={<PublicInvitation />} />
               </Routes>
