@@ -2787,3 +2787,125 @@ class MarketplaceFilters(BaseModel):
     page_size: int = 20
 
 
+
+# ==========================================
+# PHASE 36: CREDIT-BASED FEATURE GATING & CONSUMPTION ENGINE
+# ==========================================
+
+class FeatureCategory(str, Enum):
+    """Feature category for credit consumption"""
+    DESIGN = "design"
+    ADDON = "addon"
+
+
+class FeatureTier(str, Enum):
+    """Feature tier for pricing"""
+    NORMAL = "normal"
+    GOD = "god"
+    PREMIUM = "premium"
+
+
+class FeatureConfig(BaseModel):
+    """Feature configuration for credit-based gating"""
+    feature_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    feature_key: str  # Unique identifier (e.g., "theme_royal_heritage", "addon_rsvp")
+    name: str  # Display name
+    description: Optional[str] = None
+    category: FeatureCategory
+    tier: FeatureTier
+    credit_cost: int  # Credits required
+    enabled: bool = True
+    metadata: Dict[str, Any] = {}  # Additional config
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class FeatureConfigResponse(BaseModel):
+    """Response model for feature config"""
+    features: List[FeatureConfig]
+    total: int
+
+
+class UpdateFeatureConfigRequest(BaseModel):
+    """Request to update feature config (Super Admin only)"""
+    credit_cost: Optional[int] = None
+    enabled: Optional[bool] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class WeddingFeatureSelection(BaseModel):
+    """Features selected for a wedding/profile (stored before publish)"""
+    profile_id: str
+    theme_feature_key: Optional[str] = None  # Selected theme
+    addon_feature_keys: List[str] = []  # Selected add-ons
+    estimated_credits: int = 0  # Calculated total
+    is_published: bool = False
+    published_at: Optional[datetime] = None
+    credits_consumed: int = 0  # Actual credits deducted on publish
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class PublishRequest(BaseModel):
+    """Request to publish wedding with credit deduction"""
+    profile_id: str
+    confirm_credit_deduction: bool = True
+
+
+class PublishResponse(BaseModel):
+    """Response after publishing"""
+    success: bool
+    message: str
+    credits_consumed: int
+    remaining_credits: int
+    profile_id: str
+    published_at: datetime
+
+
+class UpgradeRequest(BaseModel):
+    """Request to upgrade wedding features post-publish"""
+    profile_id: str
+    new_theme_feature_key: Optional[str] = None
+    new_addon_feature_keys: Optional[List[str]] = None
+    confirm_credit_deduction: bool = True
+
+
+class UpgradeResponse(BaseModel):
+    """Response after upgrade"""
+    success: bool
+    message: str
+    credits_consumed: int  # Difference charged
+    remaining_credits: int
+    profile_id: str
+    upgraded_at: datetime
+
+
+class CreditEstimateRequest(BaseModel):
+    """Request to estimate credit cost"""
+    theme_feature_key: Optional[str] = None
+    addon_feature_keys: List[str] = []
+
+
+class CreditEstimateResponse(BaseModel):
+    """Response with credit estimate"""
+    theme_cost: int
+    addon_costs: Dict[str, int]
+    total_cost: int
+    available_credits: int
+    can_afford: bool
+    shortfall: int  # If can_afford is False
+
+
+class FeatureUsageRecord(BaseModel):
+    """Record of feature usage per wedding (for analytics)"""
+    usage_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    profile_id: str
+    admin_id: str
+    feature_key: str
+    category: FeatureCategory
+    tier: FeatureTier
+    credits_paid: int
+    action: Literal["publish", "upgrade"]  # How credits were consumed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
