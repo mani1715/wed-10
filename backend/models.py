@@ -785,6 +785,13 @@ class Profile(BaseModel):
     plan_expires_at: Optional[datetime] = None  # Plan expiry date (None for FREE or permanent)
     # PHASE 34: Design System & Theme Engine
     theme_settings: ThemeSettings = Field(default_factory=ThemeSettings)  # Premium theme configuration
+    # PHASE 37: Wedding Ownership, Draft System & Publish Workflow
+    title: str = ""  # Wedding title for admin dashboard
+    status: WeddingStatus = WeddingStatus.DRAFT  # Lifecycle status
+    selected_design_key: str = DEFAULT_THEME  # Same as design_id, for consistency
+    selected_features: List[str] = Field(default_factory=list)  # Enabled feature keys
+    total_credit_cost: int = 0  # Calculated credit cost (set on publish)
+    published_at: Optional[datetime] = None  # Timestamp when published
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     
