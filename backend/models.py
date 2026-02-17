@@ -509,6 +509,14 @@ class AdminStatus(str, Enum):
     INACTIVE = "inactive"
 
 
+class WeddingStatus(str, Enum):
+    """PHASE 37: Wedding project lifecycle status"""
+    DRAFT = "draft"  # Unlimited edits, no credit consumption
+    READY = "ready"  # All required fields filled, ready to publish
+    PUBLISHED = "published"  # Credits consumed, publicly accessible
+    ARCHIVED = "archived"  # Public link disabled, no refunds
+
+
 class Admin(BaseModel):
     """Enhanced Admin model with role and credit fields"""
     model_config = ConfigDict(extra="ignore")
