@@ -11183,6 +11183,368 @@ async def admin_marketplace_stats(admin: Admin = Depends(get_current_admin)):
         return {"referral_code": None, "profile_id": profile_id}
 
 
+
+
+# ==========================================
+# PHASE 37: WEDDING OWNERSHIP, DRAFT SYSTEM & PUBLISH WORKFLOW
+# ==========================================
+
+@api_router.post("/api/weddings/estimate-cost")
+async def estimate_wedding_cost(
+    request: Dict[str, Any],
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Estimate credit cost for a wedding configuration
+    Does not deduct credits - preview only
+    """
+    try:
+        design_key = request.get('design_key', '')
+        selected_features = request.get('selected_features', [])
+        
+        cost_breakdown = wedding_lifecycle_service.calculate_credit_cost(
+            design_key,
+            selected_features
+        )
+        
+        return {
+            'success': True,
+            'cost_breakdown': cost_breakdown
+        }
+    except Exception as e:
+        logger.error(f"Error estimating cost: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/api/weddings")
+async def get_admin_weddings(
+    status: Optional[str] = None,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Get all weddings owned by current admin
+    Optional filtering by status
+    """
+    try:
+        admin_id = current_admin['id']
+        
+        query = {'admin_id': admin_id}
+        if status:
+            query['status'] = status
+        
+        weddings_cursor = db['profiles'].find(query).sort('created_at', -1)
+        weddings = await weddings_cursor.to_list(length=None)
+        
+        # Get admin credits for UI display
+        admin = await db['admins'].find_one({'id': admin_id})
+        total_credits = admin.get('total_credits', 0)
+        used_credits = admin.get('used_credits', 0)
+        available_credits = total_credits - used_credits
+        
+        # Enrich weddings with credit estimates for drafts
+        for wedding in weddings:
+            if wedding.get('status') in ['draft', 'ready']:
+                design_key = wedding.get('selected_design_key', wedding.get('design_id', ''))
+                selected_features = wedding.get('selected_features', [])
+                cost_breakdown = wedding_lifecycle_service.calculate_credit_cost(
+                    design_key,
+                    selected_features
+                )
+                wedding['estimated_cost'] = cost_breakdown['total']
+                wedding['cost_breakdown'] = cost_breakdown
+        
+        return {
+            'success': True,
+            'weddings': weddings,
+            'total_count': len(weddings),
+            'admin_credits': {
+                'total': total_credits,
+                'used': used_credits,
+                'available': available_credits
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting weddings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/api/weddings/{wedding_id}")
+async def get_wedding_details(
+    wedding_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Get detailed wedding information
+    Includes credit estimation and ready status
+    """
+    try:
+        admin_id = current_admin['id']
+        role = current_admin.get('role', 'admin')
+        
+        # Super admin can access all, regular admin only own
+        query = {'id': wedding_id}
+        if role != 'super_admin':
+            query['admin_id'] = admin_id
+        
+        wedding = await db['profiles'].find_one(query)
+        if not wedding:
+            raise HTTPException(status_code=404, detail="Wedding not found")
+        
+        # Calculate credit cost
+        design_key = wedding.get('selected_design_key', wedding.get('design_id', ''))
+        selected_features = wedding.get('selected_features', [])
+        cost_breakdown = wedding_lifecycle_service.calculate_credit_cost(
+            design_key,
+            selected_features
+        )
+        
+        # Check ready status
+        is_ready, missing_fields = await wedding_lifecycle_service.check_ready_status(wedding)
+        
+        # Get admin credits
+        admin = await db['admins'].find_one({'id': wedding.get('admin_id')})
+        total_credits = admin.get('total_credits', 0) if admin else 0
+        used_credits = admin.get('used_credits', 0) if admin else 0
+        available_credits = total_credits - used_credits
+        
+        return {
+            'success': True,
+            'wedding': wedding,
+            'cost_breakdown': cost_breakdown,
+            'is_ready': is_ready,
+            'missing_fields': missing_fields,
+            'can_publish': is_ready and available_credits >= cost_breakdown['total'],
+            'admin_credits': {
+                'total': total_credits,
+                'used': used_credits,
+                'available': available_credits
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting wedding details: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.put("/api/weddings/{wedding_id}/status")
+async def update_wedding_status(
+    wedding_id: str,
+    request: Dict[str, str],
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Update wedding status (DRAFT -> READY -> PUBLISHED -> ARCHIVED)
+    """
+    try:
+        admin_id = current_admin['id']
+        new_status = request.get('status')
+        
+        if new_status not in ['draft', 'ready', 'published', 'archived']:
+            raise HTTPException(status_code=400, detail="Invalid status")
+        
+        wedding = await db['profiles'].find_one({
+            'id': wedding_id,
+            'admin_id': admin_id
+        })
+        
+        if not wedding:
+            raise HTTPException(status_code=404, detail="Wedding not found")
+        
+        current_status = wedding.get('status', 'draft')
+        
+        # Validate status transition
+        valid_transitions = {
+            'draft': ['ready'],
+            'ready': ['draft', 'published'],
+            'published': ['archived'],
+            'archived': []
+        }
+        
+        if new_status not in valid_transitions.get(current_status, []):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot transition from {current_status} to {new_status}"
+            )
+        
+        # For READY status, validate required fields
+        if new_status == 'ready':
+            is_ready, missing_fields = await wedding_lifecycle_service.check_ready_status(wedding)
+            if not is_ready:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot mark as ready. Missing: {', '.join(missing_fields)}"
+                )
+        
+        # Update status
+        await db['profiles'].update_one(
+            {'id': wedding_id},
+            {
+                '$set': {
+                    'status': new_status,
+                    'updated_at': datetime.now(timezone.utc)
+                }
+            }
+        )
+        
+        return {
+            'success': True,
+            'wedding_id': wedding_id,
+            'old_status': current_status,
+            'new_status': new_status,
+            'message': f'Wedding status updated to {new_status}'
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating wedding status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/weddings/{wedding_id}/publish")
+async def publish_wedding(
+    wedding_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Publish a wedding - deducts credits atomically
+    This is the main publish endpoint
+    """
+    try:
+        admin_id = current_admin['id']
+        
+        result = await wedding_lifecycle_service.publish_wedding(
+            wedding_id,
+            admin_id
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error publishing wedding: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/weddings/{wedding_id}/upgrade")
+async def upgrade_wedding_features(
+    wedding_id: str,
+    request: Dict[str, Any],
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Upgrade published wedding with new design or features
+    Deducts only the difference in credits
+    """
+    try:
+        admin_id = current_admin['id']
+        new_design_key = request.get('design_key')
+        new_features = request.get('selected_features')
+        
+        result = await wedding_lifecycle_service.upgrade_wedding_features(
+            wedding_id,
+            admin_id,
+            new_design_key,
+            new_features
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error upgrading wedding: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/weddings/{wedding_id}/archive")
+async def archive_wedding(
+    wedding_id: str,
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Archive a wedding - no credit refund
+    """
+    try:
+        admin_id = current_admin['id']
+        
+        result = await wedding_lifecycle_service.archive_wedding(
+            wedding_id,
+            admin_id
+        )
+        
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error archiving wedding: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.post("/api/weddings/{wedding_id}/slug/validate")
+async def validate_slug(
+    wedding_id: str,
+    request: Dict[str, str],
+    current_admin: dict = Depends(get_current_admin)
+):
+    """
+    Validate slug uniqueness
+    """
+    try:
+        slug = request.get('slug', '')
+        
+        if not slug:
+            return {'valid': False, 'message': 'Slug is required'}
+        
+        is_unique, error_message = await wedding_lifecycle_service.validate_slug_uniqueness(
+            slug,
+            exclude_wedding_id=wedding_id
+        )
+        
+        return {
+            'valid': is_unique,
+            'message': error_message if not is_unique else 'Slug is available'
+        }
+    except Exception as e:
+        logger.error(f"Error validating slug: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@api_router.get("/api/features/registry")
+async def get_feature_registry(
+    category: Optional[str] = None,
+    tier: Optional[str] = None
+):
+    """
+    Get available features with credit costs
+    Public endpoint for feature discovery
+    """
+    try:
+        from feature_registry import FeatureRegistry
+        registry = FeatureRegistry()
+        
+        features = registry.get_enabled_features()
+        
+        # Filter by category if provided
+        if category:
+            features = [f for f in features if f.category.value == category]
+        
+        # Filter by tier if provided
+        if tier:
+            features = [f for f in features if f.tier.value == tier]
+        
+        # Convert to dict for JSON response
+        features_list = [f.model_dump() for f in features]
+        
+        return {
+            'success': True,
+            'features': features_list,
+            'total_count': len(features_list)
+        }
+    except Exception as e:
+        logger.error(f"Error getting feature registry: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
