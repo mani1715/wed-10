@@ -127,6 +127,10 @@ Translate the given text to {language_name} while:
         Returns:
             AI-generated event description
         """
+        if not self.enabled:
+            # Return a default description if AI is disabled
+            return f"Join us for a beautiful {event_type} celebration."
+        
         system_message = """You are a creative wedding invitation content writer.
 Generate elegant, short, and heartfelt event descriptions for Indian weddings.
 Keep descriptions:
