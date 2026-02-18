@@ -37,8 +37,10 @@ class AIService:
     
     def __init__(self):
         self.api_key = os.getenv("EMERGENT_LLM_KEY")
-        if not self.api_key:
-            raise ValueError("EMERGENT_LLM_KEY not found in environment variables")
+        self.enabled = bool(self.api_key)
+        
+        if not self.enabled:
+            print("⚠️  EMERGENT_LLM_KEY not found. AI features will be disabled.")
         
         # Default to GPT-5.1 (recommended by playbook)
         self.provider = "openai"
