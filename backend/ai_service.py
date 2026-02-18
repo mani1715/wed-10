@@ -73,6 +73,9 @@ class AIService:
         Returns:
             Translated text
         """
+        if not self.enabled:
+            return content  # Return original content if AI is disabled
+        
         if target_language not in SUPPORTED_LANGUAGES:
             raise ValueError(f"Unsupported language: {target_language}")
         
