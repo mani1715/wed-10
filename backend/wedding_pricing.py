@@ -5,7 +5,7 @@ This module defines credit costs for designs and features.
 Super Admin can modify these values via API in future phases.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 from models import DesignPricing, FeaturePricing
 
 # ==========================================
