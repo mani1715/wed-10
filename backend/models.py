@@ -2924,3 +2924,195 @@ class FeatureUsageRecord(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+
+
+# ==========================================
+# PHASE 37: WEDDING OWNERSHIP & LIFECYCLE
+# ==========================================
+
+class Wedding(BaseModel):
+    """PHASE 37: Wedding Project entity with ownership and lifecycle management"""
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    admin_id: str  # Owner, mandatory
+    title: str
+    slug: str  # Unique, public URL identifier
+    status: WeddingStatus = WeddingStatus.DRAFT
+    selected_design_key: Optional[str] = None
+    selected_features: List[str] = []  # Array of feature keys
+    total_credit_cost: int = 0  # Calculated, not manually entered
+    published_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    
+    # Additional metadata
+    profile_id: Optional[str] = None  # Link to existing Profile if needed
+    description: Optional[str] = None
+    wedding_date: Optional[datetime] = None
+    
+
+class WeddingCreate(BaseModel):
+    """Request to create a new wedding"""
+    title: str
+    slug: str
+    description: Optional[str] = None
+    wedding_date: Optional[datetime] = None
+    
+    @field_validator('title')
+    def validate_title(cls, v):
+        """Validate title is not empty"""
+        if not v or not v.strip():
+            raise ValueError('Title cannot be empty')
+        return v.strip()
+    
+    @field_validator('slug')
+    def validate_slug(cls, v):
+        """Validate slug format"""
+        if not v or not v.strip():
+            raise ValueError('Slug cannot be empty')
+        # Slug must be lowercase alphanumeric with hyphens only
+        pattern = r'^[a-z0-9]+(?:-[a-z0-9]+)*$'
+        if not re.match(pattern, v.strip()):
+            raise ValueError('Slug must contain only lowercase letters, numbers, and hyphens')
+        return v.strip()
+
+
+class WeddingUpdate(BaseModel):
+    """Request to update wedding details"""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    wedding_date: Optional[datetime] = None
+    selected_design_key: Optional[str] = None
+    selected_features: Optional[List[str]] = None
+    
+    @field_validator('title')
+    def validate_title(cls, v):
+        """Validate title if provided"""
+        if v is not None and (not v or not v.strip()):
+            raise ValueError('Title cannot be empty')
+        return v.strip() if v else v
+
+
+class WeddingResponse(BaseModel):
+    """Response model for Wedding data"""
+    id: str
+    admin_id: str
+    title: str
+    slug: str
+    status: WeddingStatus
+    selected_design_key: Optional[str]
+    selected_features: List[str]
+    total_credit_cost: int
+    published_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+    profile_id: Optional[str]
+    description: Optional[str]
+    wedding_date: Optional[datetime]
+
+
+class WeddingListResponse(BaseModel):
+    """Response for listing weddings"""
+    weddings: List[WeddingResponse]
+    total: int
+
+
+class WeddingCreditEstimateRequest(BaseModel):
+    """Request to estimate credit cost for a wedding"""
+    wedding_id: str
+    design_key: Optional[str] = None
+    feature_keys: List[str] = []
+
+
+class WeddingCreditEstimateResponse(BaseModel):
+    """Response with credit estimate for wedding"""
+    wedding_id: str
+    design_cost: int
+    feature_costs: Dict[str, int]
+    total_cost: int
+    current_cost: int  # Current committed cost
+    additional_cost: int  # Additional cost if changes applied
+    available_credits: int
+    can_afford: bool
+    shortfall: int
+
+
+class WeddingPublishRequest(BaseModel):
+    """Request to publish a wedding"""
+    wedding_id: str
+    confirm_credit_deduction: bool = True
+
+
+class WeddingPublishResponse(BaseModel):
+    """Response after publishing wedding"""
+    success: bool
+    message: str
+    wedding_id: str
+    credits_consumed: int
+    remaining_credits: int
+    published_at: datetime
+    public_url: str
+
+
+class WeddingUpgradeRequest(BaseModel):
+    """Request to upgrade wedding features post-publish"""
+    wedding_id: str
+    new_design_key: Optional[str] = None
+    new_feature_keys: Optional[List[str]] = None
+    confirm_credit_deduction: bool = True
+
+
+class WeddingUpgradeResponse(BaseModel):
+    """Response after upgrading wedding"""
+    success: bool
+    message: str
+    wedding_id: str
+    credits_consumed: int  # Difference charged
+    remaining_credits: int
+    upgraded_at: datetime
+
+
+class WeddingArchiveRequest(BaseModel):
+    """Request to archive a wedding"""
+    wedding_id: str
+    confirm_archive: bool = True
+
+
+class WeddingArchiveResponse(BaseModel):
+    """Response after archiving wedding"""
+    success: bool
+    message: str
+    wedding_id: str
+    archived_at: datetime
+
+
+class WeddingStatusChangeRequest(BaseModel):
+    """Request to change wedding status"""
+    wedding_id: str
+    new_status: WeddingStatus
+
+
+class DesignPricing(BaseModel):
+    """Pricing configuration for designs"""
+    design_key: str
+    design_name: str
+    credit_cost: int
+    description: Optional[str] = None
+
+
+class FeaturePricing(BaseModel):
+    """Pricing configuration for features"""
+    feature_key: str
+    feature_name: str
+    credit_cost: int
+    description: Optional[str] = None
+    category: Optional[str] = None
+
+
+class CreditPricingConfiguration(BaseModel):
+    """Complete credit pricing configuration"""
+    designs: List[DesignPricing]
+    features: List[FeaturePricing]
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
